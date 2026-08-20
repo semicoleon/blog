@@ -41,8 +41,6 @@ menu = [
 ]
 menu_footer = [
     {url = "about", name = "About", slash = true, blank = false, size="s90"},
-    {url = "contact", name = "Contact", slash = true, blank = false, size="s90"},
-    {url = "privacy", name = "Privacy", slash = true, blank = false, size="s90"},
     {url = "sitemap.xml", name = "Sitemap", slash = false, blank = true, size="s90"},
 ]
 
@@ -88,13 +86,13 @@ foothr = false # show or hide horizontal rule above footer
 ###############################################################################
 
 title_separator = "|"  # Separator between title and title_addition, set as |, -, _, etc
-title_addition = "Fast, Lightweight, and Modern Zola Theme" # a default value for title addition (for SEO aim for 50-70 characters including the title and separator 'Abridge | title_addition')
-author = "Jake G" # Put Your Name here
-keywords = "Abridge, Abridge.css, Zola, Theme, Zola Theme, getzola, Semantic Html, Fast, lightweight" # used for the primary site index
-banner = "banner.png" # Used as default image for OpenGraph/Twitter if page specific image is undefined.
-twitter_meta = "your-user-name" # for SEO: twitter:site and twitter:creator
-google = "Your Google Site verification code."
-bing = "Your Bing Site verification code."
+title_addition = "semicoleon" # a default value for title addition (for SEO aim for 50-70 characters including the title and separator 'Abridge | title_addition')
+author = "Cole Kurkowski" # Put Your Name here
+keywords = "" # used for the primary site index
+#banner = "banner.png" # Used as default image for OpenGraph/Twitter if page specific image is undefined.
+#twitter_meta = "your-user-name" # for SEO: twitter:site and twitter:creator
+#google = "Your Google Site verification code."
+#bing = "Your Bing Site verification code."
 seo = true  # enable or disable seo-related meta tags: opengraph, facebook, twitter
 #dev = false # development mode, if true then robots.txt should prevent search indexing.
 
@@ -107,28 +105,28 @@ seo = true  # enable or disable seo-related meta tags: opengraph, facebook, twit
 ###############################################################################
 
 feed = true # this adds the RSS feed icon in the footer.
-mail = "name@example.com"
-mastodon = "https://mastodon.example.com/@username"
-element = "matrix.example.com"
+#mail = "name@example.com"
+#mastodon = "https://mastodon.example.com/@username"
+#element = "matrix.example.com"
 #buymeacoffee = "your-user-name"
-kofi = "your-user-name"
+#kofi = "your-user-name"
 #discord = "https://discord.com/invite/my-server" # https://discord.com/invite/my-server  *or*  https://discord.com/servers/my-server-id
 #twitter = "your-user-name"
 #facebook = "your-user-name"
 #linkedin = "your-user-name"
 #gitlab = "your-user-name"
-github = "your-user-name"
+github = "semicoleon"
 #codeberg = "your-user-name" # Everything after https://codeberg.org/   eg: username  *or*  username/repository
 #github_sponsor = "your-user-name"
 #bitbucket = "your-user-name"
 #python = "your-user-name"
 #docker = "your-user-name"
 #stack = "your-user-name"
-instagram = "your-user-name"
+#instagram = "your-user-name"
 #pixelfed = "https://pixelfed.example.com/" # Heaviest icon, off by default
 #pinterest = "your-user-name"
-twitch = "your-user-name"
-youtube = "channel/your-channel-id"
+#twitch = "your-user-name"
+#youtube = "channel/your-channel-id"
 #peertube = "https://peertube.example.com/@username"
 #researchgate = "your-profile-id"
 #telegram = "your-user-name"
