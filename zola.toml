@@ -12,12 +12,15 @@ taxonomies = [
 # Whether to automatically compile all Sass files in the sass directory
 compile_sass = true
 
+minify_html = false
+
 # Whether to build a search index to be used later on by a JavaScript library
 build_search_index = true
 
 [markdown]
 github_alerts = false
 external_links_target_blank = true # rel="noopener"
+bottom_footnotes = true 
 
 [markdown.highlighting]
 theme = "synthwave-84"
