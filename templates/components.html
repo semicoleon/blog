@@ -1,0 +1,22 @@
+{% component callout(type: string, title = "") -%}
+{% if type == "warning" -%}
+{% set type_title = "Warning" -%}
+{% elif type == "note" -%}
+{% set type_title = "Note" -%}
+{% else -%}{{ throw(message="unknown type: " ~ type) }}{%- endif %}
+
+<div class="callout-wrapper">
+<div class="callout" data-callout="{{type}}">
+<div class="callout-title">
+  <div class="callout-title-body">
+    {% if title | length == 0 -%}
+    {{type_title}}
+    {% else -%}
+    {{title}}
+    {%- endif %}
+  </div>
+</div>
+<div class="callout-body">{{body}}</div>
+</div>
+</div>
+{%- endcomponent callout %}

@@ -3,7 +3,7 @@ title = "Vapor Logging Customization PR Retrospective"
 date = 2026-08-20
 
 [extra]
-#toc = true
+toc = true
 
 [taxonomies]
 tags = [
@@ -67,7 +67,7 @@ What immediately jumped out to me about this code was the lack of complex interd
 
 One possible way forward would be to replace the fragment producing sections with methods and allow the end user to call them however the liked. That would be simple, but it wouldn't compose very well. The overall shape of the logging method would be the same, and it would be easy to accidentally break things in a way that makes it difficult for an end user to prepend or append to a default message. If a simple method per fragment producing section doesn't quite meet our requirements, what's the next place to look for a solution? Types, of course!
 
-# Going to pieces, er... fragments
+# Going to Fragments
 
 My solution was to create a custom type for each fragment producer which conformed to a new `LoggerFragment` protocol. The goal of `LoggerFragment` is to allow each bit of code representing a part of the default log message to become a type that can be combined with others freely by users of the library. Users should also be able to implement their own fragments and have them work in concert with the default ones without much fuss. Using a protocol makes it easy to define things like combinators as provided methods on the protocol, which is a nice ergonomics advantage over a solution based on defining methods on a single logger type[^methodSolutionErgonomics]. The protocol currently only contains one (non-defaulted) method:
 [^methodSolutionErgonomics]: Since Swift doesn't allow extensions on function types, you can't chain combinators the way you can with `Sequence`s and other protocol based combinators. That can hurt discoverability.
@@ -133,10 +133,12 @@ To demonstrate how this works, we'll output the log message and then a separator
 ```swift
 MessageFragment().and(LiteralFragment("b").separated(" "))
 ```
-<!-- TODO: Fix -->
-> [!warning]
-> `LiteralFragment` does not request a separator on its own. Generally if you're trying to use `separated` to add a separator between literals you could just... use one literal containing both literals and the separator instead.
 
+{% <callout type="warning"> %}
+
+`LiteralFragment` does not request a separator on its own. Generally if you're trying to use `separated` to add a separator between literals you could just... use one literal containing both literals and the separator instead.
+
+{% </callout> %}
 If we log a message "a" with this fragment, the result will be "a b"[^ignoringNewlines].
 [^ignoringNewlines]: There will also be a newline in the output, but that's added by the logger unconditionally so I'm ignoring it here.
 
@@ -229,11 +231,13 @@ Once I modified my local copy of the main branch to no longer use `conciseSource
 | Discarding output text from `TestConsole` | 0.356s | 0.483s          |
 | Increasing amount of metadata             | 0.491s | 0.637s          |
 
-> [!note] Updated performance numbers
->
-> Out of curiosity, when writing this post I re-ran the performance tests on the same MacBook, and my Windows PC[^swiftWindows]. The results I got in both cases were not what I was expecting. On Windows I was seeing no consistent performance difference, and on the MacBook I was consistently seeing the `LoggerFragment` branch outperform the main branch from before it was merged. I haven't had time to dig into that any deeper, so it's possible I made a mistake somewhere. That being said, it also seems plausible that compiler improvements have legitimately made the slight performance deficit of the `LoggerFragment` branch disappear. I hope to have time to dig into that a little further soon.
-
 Those numbers weren't bad (in fact they were still significantly faster than the original logger due to `conciseSourcePath`) so the Vapor team decided to merge the PR. I'm quite happy with how it turned out, and that the change was well received by the Vapor team.
+
+{% <callout type="note" title="Updated performance numbers"> %}
+
+When writing this post I re-ran the performance tests on the same MacBook, and my Windows PC[^swiftWindows] out of curiosity. The results I got in both cases were not what I was expecting. On Windows I was seeing no consistent performance difference, and on the MacBook I was consistently seeing the `LoggerFragment` branch outperform the main branch from before my PR was merged. I haven't had time to dig into that any deeper, so it's possible I made a mistake somewhere. That being said, it also seems plausible that compiler improvements have legitimately made the slight performance deficit of the `LoggerFragment` branch disappear. I hope to have time to dig into that a little further soon.
+
+{% </callout> %}
 
 [^swiftWindows]: Swift actually works on Windows now! It's weird!!
 <!-- Out of curiosity, I re-ran the numbers on my Windows PC (Ryzen 9 5900X, Swift 6.3.2) and found that the numbers were more or less identical between the feature branch and the commit to main just before the branch was merged[^commitHash] (~0.331s average). There are a lot of possible explanations, but I imagine improvements to compiler optimizations are involved in some way.

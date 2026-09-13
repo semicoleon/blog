@@ -1,0 +1,39 @@
+.callout[data-callout="warning"] {
+  --callout-color: var(--callout-warning);
+  // TODO: icon
+}
+
+.callout[data-callout="note"] {
+  --callout-color: var(--callout-note);
+}
+
+.callout {
+  border-style: solid;
+  border-color: rgba(var(--callout-color), var(--callout-border-alpha));
+  border-width: var(--callout-border-width);
+  border-radius: var(--callout-boder-radius);
+  margin: 1em 0;
+  background-color: rgba(var(--callout-color), 0.1);
+  padding: var(--callout-padding);
+}
+
+.callout-title {
+  display: flex;
+  gap: 4px;
+  color: rgb(var(--callout-color));
+  line-height: 1.3;
+  align-items: flex-start;
+}
+
+.callout-title-body {
+  font-weight: 600;
+}
+
+html {
+  --callout-warning: 233, 151, 63;
+  --callout-note:  2, 122, 255;
+  --callout-border-alpha: 0.25;
+  --callout-border-width: 0px;
+  --callout-boder-radius: 4px;
+  --callout-padding: 18px;
+}
