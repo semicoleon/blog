@@ -163,7 +163,7 @@ js_switcher = true # The button that allows manually changing between light/dark
 js_switcher_default = "dark" # default nojs switcher mode: dark, light (make sure to also set $switcherDefault in abridge.scss)
 
 search_library = "elasticlunr"
-stylesheets = ["callouts.css", "abridge.css"]
+stylesheets = ["abridge.css"]
 
 webmanifest = "manifest.min.json" # Required for PWAs
 
