@@ -14,16 +14,18 @@ tags = [
 ]
 +++
 
-I've spent a lot of time working in Vapor servers over the last 6 years, and more recently have found myself building new Vapor servers in the context of cloud applications. While Vapor's default logging system worked fine, it made some choices about what (and more importantly when) to log certain information that were causing problems for me in these newer projects<!-- more -->. A coworker had already created a new version of Vapor's[^notVaporDisclaimer] `ConsoleLogger` that included a timestamp, which addressed one major issue. I needed some additional information to be logged, and at the time the only thing I could do was create *another* copy of `ConsoleLogger` and customize it to do what I needed. There was nothing wrong with that approach in principle, but I was frustrated by the fact that every minor change needed a whole new `ConsoleLogger` implementation. Most of which was inevitably just copy pasted from the original, and therefore a great place for bugs to accumulate. I kept finding myself thinking about ways to improve the situation, and eventually [authored a PR](https://github.com/vapor/console-kit/pull/182) that increased the flexibility of `ConsoleKit`'s logging features.
+I've spent a lot of time working in [Swift](https://www.swift.org/) HTTP servers using the [Vapor](https://vapor.codes/) framework over the last 6 years. More recently I've found myself building new Vapor servers in the context of cloud applications. While Vapor's default logging system worked fine, it made some choices about what (and more importantly when) to log certain information that were causing problems for me in these newer projects<!-- more -->. 
+
+A coworker had already created a new version of Vapor's[^notVaporDisclaimer] `ConsoleLogger` that included a timestamp, which addressed one major issue. I needed some additional information to be logged though, and at the time the only thing I could do was create *another* copy of `ConsoleLogger` and customize it to do what I needed. There was nothing wrong with that approach in principle, but I was frustrated by the fact that every minor change needed a whole new `ConsoleLogger` implementation. Most of the contents of these new loggers were inevitably copy pasted from the original, and therefore a great place for bugs to accumulate. I kept finding myself thinking about ways to improve the situation, and eventually [authored a PR](https://github.com/vapor/console-kit/pull/182) that increased the flexibility of `ConsoleKit`'s logging features. Today I want to take a look at the problem the PR solved, and how I solved it. First let's zoom in on what the exactly problem was, from my perspective.
 
 [^notVaporDisclaimer]: I'm calling it "Vapor's" but it actually exists in the [`ConsoleKit`](https://github.com/vapor/console-kit) repository which belongs to the Vapor orginization
 
 # The Problem
 
 What I wanted was the ability to customize how log messages were constructed, but without reimplementing *all* of the logic `ConsoleLogger` was using to construct the default message. A minimum viable solution should:
-1. Allow an end user to include pieces of the default log message format.
-2. Be able to add their own completely custom code to the process of constructing the message. Ideally without needing to be concerned with the details of the logger type itself.
-3. Since we're making changes anyway, it would be nice if an end user could easily prepend or append to a log message they're mostly happy with without doing additional work to the integrate the majority of the logging code they have with the bit they'd like to add
+1. Allow an end user to easily include pieces of the default log message format.
+2. Be able to add their own completely custom code to the process of constructing the message, ideally without needing to be concerned with the details of the logger type itself.
+3. Since we're making changes anyway, it would be nice if an end user could easily prepend or append to a log message they're mostly happy with without doing additional work to integrate the new parts with the existing ones.
 
 The old `ConsoleLogger` fails these requirements before it even gets to the starting line because it supports no message customization at all. Additionally the fact that all of the implementation details are private to the library means that we can't just create a new version of `ConsoleLogger` without having to copy a bunch of code out of the library that likely has nothing to do with the customizations we want to make.
 
@@ -60,16 +62,16 @@ if self.logLevel <= .debug {
 self.console.output(text)
 ```
 
-This code is straightforward. There are several independent fragments of text that are appended to the final log message. While there is some control flow, it really only determines if the fragment of text it wraps will be present in the final message. There's no complex bookkeeping or interdependencies between different fragments inside the method. None of the code needs to mutate any shared state either, so reordering the sections wouldn't be a problem.
+This code is straightforward. There are several independent "fragments" of text that are appended to the final log message. Each of these fragments is self-contained. While there is some control flow, it really only determines if the fragment of text it wraps will be present in the final message. There's no complex bookkeeping or interdependencies between different fragments inside the method. None of the code needs to mutate any shared state either, so reordering the sections wouldn't be a problem.
 
 # Solutions
-What immediately jumped out to me about this code was the lack of complex interdependencies. Each little section handles outputting (or not outputting) a self contained little fragment of the final log message. None of the sections needed to do complex control flow based on the what other fragments were doing, and for the most part the code is just doing some basic string formatting based on the metadata for the logged message. 
+What immediately jumped out to me about this code was the lack of interdependencies. Each little section handles outputting (or not outputting) a self-contained little fragment of the final log message. None of the sections needed to do complex control flow based on the what other fragments were doing, and for the most part the code is just doing some basic string formatting based on the metadata for the logged message. 
 
-One possible way forward would be to replace the fragment producing sections with methods and allow the end user to call them however the liked. That would be simple, but it wouldn't compose very well. The overall shape of the logging method would be the same, and it would be easy to accidentally break things in a way that makes it difficult for an end user to prepend or append to a default message. If a simple method per fragment producing section doesn't quite meet our requirements, what's the next place to look for a solution? Types, of course!
+One possible way forward would be to replace the fragment producing sections with methods and allow the end user to call them however the liked. That would be simple, but it wouldn't compose very well. The overall shape of the logging method would be the same, and it would be easy to accidentally write code in a way that makes it difficult for an end user to prepend or append to a default message. If a simple method per fragment producing section doesn't quite meet our requirements, what's the next place to look for a solution? Types, of course!
 
 # Going to Fragments
 
-My solution was to create a custom type for each fragment producer which conformed to a new `LoggerFragment` protocol. The goal of `LoggerFragment` is to allow each bit of code representing a part of the default log message to become a type that can be combined with others freely by users of the library. Users should also be able to implement their own fragments and have them work in concert with the default ones without much fuss. Using a protocol makes it easy to define things like combinators as provided methods on the protocol, which is a nice ergonomics advantage over a solution based on defining methods on a single logger type[^methodSolutionErgonomics]. The protocol currently only contains one (non-defaulted) method:
+My solution was to create a custom type for each fragment producer, which conformed to a new `LoggerFragment` protocol. The goal of `LoggerFragment` is to allow each bit of code representing a part of the default log message to become a type that can be combined with others freely by users of the library. Users should also be able to implement their own fragments and have them work in concert with the default ones without much fuss. Using a protocol makes it easy to define things like combinators as provided methods on the protocol, which is a nice ergonomics advantage over a solution based on defining methods on a single logger type[^methodSolutionErgonomics]. The protocol currently only contains one (non-defaulted) method:
 [^methodSolutionErgonomics]: Since Swift doesn't allow extensions on function types, you can't chain combinators the way you can with `Sequence`s and other protocol based combinators. That can hurt discoverability.
 ```swift
 public protocol LoggerFragment: Sendable {
@@ -118,7 +120,7 @@ Other than the fact that the code is in a method defined on a new type, it isn't
 
 ## Combinators
 
-In addition to the basic functionality of the protocol, `LoggerFramgent` also provides methods to construct a number of different combinator types, wrapping them around the fragment the method is called on, similar to how some of the lazy `Sequence` and `Collection` extension methods work. For example, `separated` allows you to insert a separator before the fragment it's called on (though a separator will only be output if a previous fragment indicated that one is needed). The provided method on the protocol just wraps the `LogFragment` it's called on in the combinator type `SeparatorFragment`, passing along the separator text to use. That method looks like this:
+In addition to the basic functionality of the protocol, `LoggerFramgent` also provides methods to construct a number of different combinator types. These methods wrap the fragment the method is called on with the combinator type, similar to how some of the lazy `Sequence` and `Collection` extension methods work. For example, `separated` allows you to insert a separator before the fragment it's called on (though a separator will only be output if a previous fragment indicated that one is needed). The provided method on the protocol just wraps the `LoggerFragment` it's called on with `SeparatorFragment`, passing along the separator text to use. That method looks like this:
 
 ```swift
 /// Appends the given separator text to the output before `self`'s output, as long as a separator is needed.
@@ -139,7 +141,9 @@ MessageFragment().and(LiteralFragment("b").separated(" "))
 `LiteralFragment` does not request a separator on its own. Generally if you're trying to use `separated` to add a separator between literals you could just... use one literal containing both literals and the separator instead.
 
 {% </callout> %}
-If we log a message "a" with this fragment, the result will be "a b"[^ignoringNewlines].
+
+If we log a message "a" with this fragment, the result will be "a b" [^ignoringNewlines].
+
 [^ignoringNewlines]: There will also be a newline in the output, but that's added by the logger unconditionally so I'm ignoring it here.
 
 # Old vs. New
