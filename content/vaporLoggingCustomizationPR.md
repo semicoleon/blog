@@ -16,7 +16,9 @@ tags = [
 
 I've spent a lot of time working in [Swift](https://www.swift.org/) HTTP servers using the [Vapor](https://vapor.codes/) framework over the last 6 years. More recently I've found myself building new Vapor servers in the context of cloud applications. While Vapor's default logging system worked fine, it made some choices about what (and more importantly when) to log certain information that were causing problems for me in these newer projects<!-- more -->. 
 
-A coworker had already created a new version of Vapor's[^notVaporDisclaimer] `ConsoleLogger` that included a timestamp, which addressed one major issue. I needed some additional information to be logged though, and at the time the only thing I could do was create *another* copy of `ConsoleLogger` and customize it to do what I needed. There was nothing wrong with that approach in principle, but I was frustrated by the fact that every minor change needed a whole new `ConsoleLogger` implementation. Most of the contents of these new loggers were inevitably copy pasted from the original, and therefore a great place for bugs to accumulate. I kept finding myself thinking about ways to improve the situation, and eventually [authored a PR](https://github.com/vapor/console-kit/pull/182) that increased the flexibility of `ConsoleKit`'s logging features. Today I want to take a look at the problem the PR solved, and how I solved it. First let's zoom in on what the exactly problem was, from my perspective.
+A coworker had already created a new version of Vapor's[^notVaporDisclaimer] `ConsoleLogger` that included a timestamp, which addressed one major issue. I needed some additional information to be logged though, and at the time the only thing I could do was create *another* copy of `ConsoleLogger` and customize it to do what I needed. There was nothing wrong with that approach in principle, but I was frustrated by the fact that every minor change needed a whole new `ConsoleLogger` implementation. Most of the contents of these new loggers were inevitably copy pasted from the original, and therefore a great place for bugs to accumulate. I kept finding myself thinking about ways to improve the situation, and eventually [authored a PR](https://github.com/vapor/console-kit/pull/182) that increased the flexibility of `ConsoleKit`'s logging features. 
+
+In this post we'll take a closer look at the problem the PR solved, and how I addressed it. Then we'll compare my solution to the original implementation a bit. First let's zoom in on what the exactly problem was, from my perspective.
 
 [^notVaporDisclaimer]: I'm calling it "Vapor's" but it actually exists in the [`ConsoleKit`](https://github.com/vapor/console-kit) repository which belongs to the Vapor orginization
 
@@ -205,11 +207,11 @@ public func timestampDefaultLoggerFragment(
 This kind of flexibility is exactly what I was looking for when I started thinking about this issue, so I'm quite happy to see it working as intended (and the PR merged). 
 
 # Performance
-No discussion of a fundamental change to a library would be complete without talking about performance. You can [see the final test code from the PR here](https://github.com/vapor/console-kit/pull/182/changes#diff-ddedf2001071b48687d64f13844d662a876f90f717f0a416e62fa308cfa0866e). My initial measurements, made on a relatively old 2019 2.3 GHz 8-Core Intel i9 MacBook Pro[^unknownSwiftVersion], showed that my feature branch was almost twice as fast as the main branch! That would be exciting, but none of the changes I've outlined here could possibly account for a 2x speedup so.... what??? 
+No discussion of a fundamental change to a library would be complete without talking about performance. You can [see the final test code from the PR here](https://github.com/vapor/console-kit/pull/182/changes#diff-ddedf2001071b48687d64f13844d662a876f90f717f0a416e62fa308cfa0866e). My initial measurements, made on a relatively old 2019 2.3 GHz 8-Core Intel i9 MacBook Pro[^unknownSwiftVersion], showed that my feature branch was almost twice as fast as the main branch! That would be exciting, but none of the changes I've outlined here could possibly account for a 2x speedup so... what??? 
 
 [^unknownSwiftVersion]: Unfortunately I don't remember exactly which version of Swift was installed at the time
 
-If you look at the pull request, you'll see that there are a *lot* of changes that are completely unrelated to the logger fragment code. There were a number of `Sendable` issues that needed to be resolved, and `ConsoleKit` had a number of other minor changes/fixes that really needed to be made. Some of these changes didn't *need* to be part of this PR, but since I was moving the old code into different places in the repo anyway it was pretty reasonable to just make those changes here rather than in a bunch of separate PRs. One of these changes was removing this function
+If you look at the pull request, you'll see that there are a *lot* of changes that are completely unrelated to the logger fragment code. There were a number of `Sendable` issues that needed to be resolved, and `ConsoleKit` had a number of other minor changes/fixes that were overdue. Some of these changes didn't *need* to be part of this PR, but since I was moving the old code into different places in the repo anyway it was pretty reasonable to just make those changes here rather than in a bunch of separate PRs. One of these changes was removing this function
 
 ```swift
 private func conciseSourcePath(_ path: String) -> String {
@@ -221,10 +223,10 @@ private func conciseSourcePath(_ path: String) -> String {
 }
 ```
 
-This was necessary in older versions of Swift to get a sensible file path (i.e. one that doesn't include the entire absolute path the binary was built at) out of the `#file` magic identifier[^macroOrMagic]. The exact behavior of the `#file(path|ID)?` magic identifiers varies based on the Swift language mode, [SE-0285](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0285-ease-pound-file-transition.md) has the details on the transition plan if you're curious. The short version is that my PR came after the Vapor team had bumped the minimum Swift compiler version supported to one after the introduction of `#fileID`[^swiftLogFileId], so `ConsoleKit` no longer needed to perform this processing at run time. Perhaps unsurprisingly, given that `conciseSourcePath` splits the path and then splits the resulting array before joining the result back together, this single change accounts for the 2x speedup between main and my feature branch.
+This was necessary in older versions of Swift to get a sensible file path (i.e. one that doesn't include the entire absolute path the binary was built at) out of the `#file` magic identifier[^macroOrMagic]. The exact behavior of the `#file(path|ID)?` magic identifiers varies based on the Swift language mode. The Swift Evolution proposal [SE-0285](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0285-ease-pound-file-transition.md) has the details on the transition plan if you're curious. The short version is that my PR came after the Vapor team had bumped the minimum Swift compiler version supported to one after the introduction of `#fileID`[^swiftLogFileId], so `ConsoleKit` no longer needed to perform this processing at run time. Perhaps unsurprisingly, given that `conciseSourcePath` splits the path and then splits the resulting array before joining the result back together, this single change accounts for the 2x speedup between main and my feature branch.
 
 [^macroOrMagic]: `#file` and friends used to be considered "magic identifiers", but now that macros exist they're considered macros. Does it make sense to call it a macro when talking about a time before Swift had macros?
-[^swiftLogFileId]: `swift-log` uses the compiler version to determine whether to use `#fileId` so we don't have to do anything else to opt in to this behavior (This appears to no longer be the case, I assume swift-log has dropped support for Swift versions before `#fileId` was supported).
+[^swiftLogFileId]: <s>`swift-log` uses the compiler version to determine whether to use `#fileId` so we don't have to do anything else to opt in to this behavior.</s> This appears to no longer be the case. I assume swift-log has dropped support for Swift versions before `#fileId` was supported (or I just completely misremembered, I haven't dug through the git history to verify one way or the other). Either way `swift-log` does the right thing without further intervention on our part.
 
 Once I modified my local copy of the main branch to no longer use `conciseSourcePath` the performance measurements were *much* more in line with my expectations. 
 
@@ -235,7 +237,7 @@ Once I modified my local copy of the main branch to no longer use `conciseSource
 | Discarding output text from `TestConsole` | 0.356s | 0.483s          |
 | Increasing amount of metadata             | 0.491s | 0.637s          |
 
-Those numbers weren't bad (in fact they were still significantly faster than the original logger due to `conciseSourcePath`) so the Vapor team decided to merge the PR. I'm quite happy with how it turned out, and that the change was well received by the Vapor team.
+Those numbers weren't bad (in fact they were still significantly faster than the original logger due to `conciseSourcePath`) so the Vapor team decided to merge the PR once all of the tangential `Sendable` (and other miscellaneous issues) were taken care of.
 
 {% <callout type="note" title="Updated performance numbers"> %}
 
@@ -244,6 +246,15 @@ When writing this post I re-ran the performance tests on the same MacBook, and m
 {% </callout> %}
 
 [^swiftWindows]: Swift actually works on Windows now! It's weird!!
+
+# Conclusion
+
+`LoggerFragment` has been a part of `ConsoleKit` for quite some time now, at time of writing[^writingDelay]. The core of the feature hasn't needed any major changes in that time. Several improvements to the feature have been made by others though, including the addition of several useful new fragments and a result builder that improves on the ergonomics of building common fragment chains[^fragementMethodCounterintuitive]. That's exciting to me, since it means the basic feature was flexible enough to be expanded on by new people. It's unfortunate the performance of `LoggerFragment` was a bit worse than the simple hardcoded log message[^afterConciseSourcePath], but the performance difference was ultimately pretty minor[^maybePerformanceImprovement]. I think the additional flexibility is well worth that tradeoff. Especially since comparing the performance of the public releases of `ConsoleKit` would actually show that this PR significantly improved performance due to those tangentially related changes we looked at earlier. I'm quite happy with how this change turned out overall, and that the change was well received by the Vapor team.
+
+[^writingDelay]: It took me *way* too long to get around to writing this, good **god**.
+[^afterConciseSourcePath]: After accounting for the removal of `conciseSourcePath`, anyway.
+[^maybePerformanceImprovement]: And at least *potentially* isn't present anymore.
+[^fragementMethodCounterintuitive]: The method syntax can be a bit counterintuitive, especially when it comes to inserting separators.
 <!-- Out of curiosity, I re-ran the numbers on my Windows PC (Ryzen 9 5900X, Swift 6.3.2) and found that the numbers were more or less identical between the feature branch and the commit to main just before the branch was merged[^commitHash] (~0.331s average). There are a lot of possible explanations, but I imagine improvements to compiler optimizations are involved in some way.
 
 [^commitHash]: `7d0898ed481e1855ec549924ab701bdc6f754b18` is the commit hash
